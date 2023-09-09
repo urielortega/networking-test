@@ -7,22 +7,19 @@
 
 import SwiftUI
 
+// View that shows user details and followers
 struct ContentView: View {
     @State private var showingChangeUsernameView = false
-
-    @State private var showingErrorAlert = false
-    @State private var errorMessage = ""
     
-    @State private var username = "urielortega"
-
-    @State private var gitHubUser: GitHubUser? // Displayed user.
-    @State private var userFollowers: [GitHubFollower]? // Followers of the displayed user.
-
+    // 1. Instance of EnvironmentObject
+    @StateObject var searchedUser = SearchedUser()
+    
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-                    AsyncImage(url: URL(string: gitHubUser?.avatarUrl ?? "")) { phase in
+                    // User picture.
+                    AsyncImage(url: URL(string: searchedUser.gitHubUser.avatarUrl)) { phase in
                         if let image = phase.image { // Image was loaded.
                             image
                                 .resizable()
@@ -38,24 +35,28 @@ struct ContentView: View {
                     }
                     .frame(width: 120, height: 120)
                     
-                    Text(gitHubUser?.login ?? "Loading username...")
+                    // Username.
+                    Text(searchedUser.gitHubUser.login)
                         .bold()
                         .font(.title3)
                     
-                    Text(gitHubUser?.bio ?? "Loading user bio...")
+                    // User bio.
+                    Text(searchedUser.gitHubUser.bio)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                     
-                    Text("📍\n\(gitHubUser?.location ?? "Loading user location...")")
+                    // User location.
+                    Text("📍\n\(searchedUser.gitHubUser.location)")
                         .multilineTextAlignment(.center)
                         .font(.footnote)
                     
+                    // List of user followers.
                     VStack(alignment: .leading) {
                         Text("Followers")
                             .bold()
                             .font(.title2)
                         
-                        ForEach(userFollowers ?? Array<GitHubFollower>()) { follower in
+                        ForEach(searchedUser.gitHubUserFollowers) { follower in
                             ZStack {
                                 RoundedRectangle(cornerRadius: 10)
                                     .fill(.gray.opacity(0.2))
@@ -82,31 +83,17 @@ struct ContentView: View {
                 }
                 .sheet(isPresented: $showingChangeUsernameView) {
                     ChangeUsernameView()
-            }
+                }
+                .alert("Something went wrong", isPresented: $searchedUser.showingErrorAlert) { } message: {
+                    Text(searchedUser.errorMessage)
+                }
             }
         }
+        // 2. Inject EnvironmentObject to the main View.
+        .environmentObject(searchedUser)
         .task {
-            await searchUser(withUsername: username)
-        }
-    }
-    
-    func searchUser(withUsername username: String) async {
-        do {
-            gitHubUser = try await getUser(withUsername: username)
-            userFollowers = try await getUserFollowers(withUsername: username)
-            print(userFollowers?.count ?? "Not able to count userFollowers.")
-        } catch GHError.invalidURL {
-            errorMessage = "Please enter a valid username."
-            showingErrorAlert = true
-        } catch GHError.invalidResponse {
-            errorMessage = "Please try again."
-            showingErrorAlert = true
-        } catch GHError.invalidData {
-            errorMessage = "Please try again."
-            showingErrorAlert = true
-        } catch {
-            errorMessage = "Unexpected error."
-            showingErrorAlert = true
+            await searchedUser.getGitHubUser(withUsername: searchedUser.username)
+            await searchedUser.getGitHubUserFollowers(withUsername: searchedUser.username)
         }
     }
 }

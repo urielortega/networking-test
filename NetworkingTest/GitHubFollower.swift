@@ -7,6 +7,7 @@
 
 import Foundation
 
+// Struct used to show the user followers details.
 struct GitHubFollower: Codable, Identifiable {
     let login: String
     let id: Int
